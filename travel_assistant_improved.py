@@ -239,22 +239,6 @@ def generate_travel_story(photos, custom_input):
 
     return result
 
-def save_and_suggest_checklist(destination, duration, mobility, health_focus):
-    """保存行程信息并返回提示信息"""
-    tips = f"""
-    ✅ 已保存行程信息！
-
-    📍 目的地：{destination}
-    ⏰ 时长：{duration}
-    🚶 行动能力：{mobility}
-    ❤️ 健康关注点：{health_focus if isinstance(health_focus, str) else '、'.join(health_focus)}
-
-    ✨ 现在您可以：
-    1. 点击上方"🎁 继续生成清单"按钮直接生成清单
-    2. 或前往"📝 清单与导游服务"页面查看已自动填充的信息
-    """
-    return tips
-
 def create_app():
     """创建Gradio应用"""
     # 兴趣偏好选项
@@ -382,8 +366,16 @@ def create_app():
                 )
 
                 # "继续生成清单"按钮：使用当前行程页面的输入直接生成清单
+                def continue_to_checklist(destination, duration, health_focus):
+                    # 将健康关注点转换为特殊需求描述
+                    if isinstance(health_focus, list):
+                        special_needs = "、".join(health_focus)
+                    else:
+                        special_needs = str(health_focus)
+                    return generate_checklist(destination, duration, special_needs)
+
                 btn3.click(
-                    fn=generate_checklist,
+                    fn=continue_to_checklist,
                     inputs=[dest, dur, health_focus],
                     outputs=[output3]
                 )
