@@ -353,6 +353,12 @@ def create_app():
                             </div>
                             """
                         )
+                        output3 = gr.Textbox(
+                            label="🎁 一键清单生成结果",
+                            lines=20,
+                            max_lines=30,
+                            info="点击上方按钮生成清单，结果将显示在此处"
+                        )
 
                 btn1.click(
                     fn=generate_destination_recommendation,
@@ -408,7 +414,7 @@ def create_app():
                             info="例如：高血压、糖尿病、需携带医疗器械等"
                         )
                         btn3 = gr.Button("📋 生成清单", variant="primary", size="lg")
-                        output3 = gr.Textbox(
+                        output3_for_tab2 = gr.Textbox(
                             label="✨ 清单内容",
                             lines=20,
                             max_lines=30,
@@ -418,7 +424,7 @@ def create_app():
                 btn3.click(
                     fn=generate_checklist,
                     inputs=[checklist_dest, checklist_dur, checklist_needs],
-                    outputs=[output3]
+                    outputs=[output3_for_tab2]
                 )
 
             # Tab 3: 旅行游记生成
