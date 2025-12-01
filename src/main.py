@@ -192,14 +192,16 @@ def create_app() -> gr.Blocks:
                     image_paths = [img.name for img in images]
                     audio_path = audio.name if audio else None
                     
-                    # Create video
+                    # Create video - 使用适合手机的9:16竖屏比例
                     video_path = create_video_from_images(
                         image_paths,
                         audio_path,
                         fps,
                         duration_per_image,
                         transition_duration,
-                        animation_type
+                        animation_type,
+                        target_width=720,
+                        target_height=1280  # 9:16 竖屏比例，适合手机播放
                     )
                     
                     return "", f"视频生成成功！", video_path, video_path

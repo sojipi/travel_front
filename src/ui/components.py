@@ -401,9 +401,12 @@ def create_video_editor_section() -> Dict[str, Any]:
             lines=2
         )
         
-        # Video output
+        # Video output - 优化显示尺寸，适合电脑观看
         video_output = gr.Video(
-            label="🎥 生成的视频"
+            label="🎥 生成的视频",
+            height=480,  # 降低显示高度，适合电脑屏幕
+            width=270,   # 保持9:16比例，270x480
+            format="mp4"
         )
         
         # Download button

@@ -7,7 +7,7 @@ import os
 import tempfile
 from typing import List, Optional, Dict, Any
 import moviepy.editor as mpy
-from moviepy.video.fx import fadein, fadeout
+from moviepy.video.fx.all import fadein, fadeout
 
 
 def validate_media_files(images: List[str], audio: Optional[str] = None) -> Dict[str, Any]:
@@ -52,7 +52,9 @@ def create_video_from_images(
     fps: int = 24,
     duration_per_image: float = 3.0,
     transition_duration: float = 0.5,
-    animation_type: str = "fade"
+    animation_type: str = "fade",
+    target_width: int = 720,
+    target_height: int = 1280  # 9:16 竖屏比例，适合手机播放
 ) -> str:
     """
     Create a video from images with optional audio, transitions, and animations.
@@ -79,6 +81,16 @@ def create_video_from_images(
         for i, img_path in enumerate(images):
             # Create base image clip
             clip = mpy.ImageClip(img_path)
+            
+            # Resize and crop to fit target dimensions (maintaining aspect ratio)
+            # First, resize the image to fit within target dimensions
+            clip = clip.resize(height=target_height) if clip.h < clip.w else clip.resize(width=target_width)
+            
+            # Then, center and crop if necessary
+            if clip.w > target_width:
+                x_center = clip.w // 2
+                y_center = clip.h // 2
+                clip = clip.crop(x_center=x_center, y_center=y_center, width=target_width, height=target_height)
             
             # Set duration for each clip
             clip = clip.set_duration(duration_per_image)
@@ -142,8 +154,9 @@ def create_video_from_images(
             # Set the audio to the video
             video = video.set_audio(audio_clip)
         
-        # Set FPS for the final video
+        # Set FPS and ensure target resolution
         video = video.set_fps(fps)
+        video = video.resize(width=target_width, height=target_height)
         
         # Create temporary file to save the video
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
