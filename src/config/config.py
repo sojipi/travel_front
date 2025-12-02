@@ -13,6 +13,12 @@ MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
 MAX_TOKENS = 4096
 TEMPERATURE = 0.7
 
+# ModelScope API Configuration
+MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "") or API_KEY
+MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/"
+QWEN_MODEL_NAME = "Qwen/Qwen3-VL-8B-Instruct"
+DEEPSEEK_MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+
 # Application Settings
 APP_TITLE = "🧳 银发族智能旅行助手"
 APP_DESCRIPTION = "专为中老年朋友设计的温暖贴心的旅行规划伙伴"

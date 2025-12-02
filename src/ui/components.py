@@ -340,8 +340,8 @@ def create_video_editor_section() -> Dict[str, Any]:
     with gr.Column(scale=1):
         header = gr.HTML('''
         <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 25px; border-radius: 15px; margin-bottom: 20px; text-align: center;">
-            <h2 style="margin: 0; font-size: 32px;">🎬 视频制作</h2>
-            <p style="margin: 10px 0 0 0; font-size: 16px;">将您的旅行照片制作成精美的视频</p>
+            <h2 style="margin: 0; font-size: 32px;">🎬 AI视频制作</h2>
+            <p style="margin: 10px 0 0 0; font-size: 16px;">AI智能分析图片，自动生成精美视频</p>
         </div>
         ''')
         
@@ -353,45 +353,25 @@ def create_video_editor_section() -> Dict[str, Any]:
         
         # Audio upload section
         audio_input = gr.File(
-            label="🎵 上传音频（可选）",
+            label="🎵 上传背景音乐（可选）",
             file_types=[".mp3", ".wav", ".ogg"]
         )
         
-        # Video settings
-        with gr.Row(): 
-            fps = gr.Slider(
-                minimum=10, 
-                maximum=60, 
-                value=24, 
-                step=1,
-                label="🎞️ 帧率 (FPS)"
-            )
-            
-            duration_per_image = gr.Slider(
-                minimum=0.5, 
-                maximum=10.0, 
-                value=3.0, 
-                step=0.1,
-                label="⏱️ 每张图片显示时长 (秒)"
-            )
-        
-        with gr.Row(): 
-            transition_duration = gr.Slider(
-                minimum=0.1, 
-                maximum=2.0, 
-                value=0.5, 
-                step=0.1,
-                label="🔄 转场时长 (秒)"
-            )
-            
-            animation_type = gr.Dropdown(
-                choices=["fade", "zoom", "pan"],
-                value="fade",
-                label="✨ 动画效果"
-            )
+        # AI Features description
+        features_description = gr.HTML('''
+        <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #ff6b6b;">
+            <h3 style="color: #333; margin-top: 0; font-size: 18px;">🤖 AI智能功能</h3>
+            <ul style="color: #666; margin: 10px 0 0 0; padding-left: 20px; line-height: 1.8;">
+                <li>自动分析图片内容和场景</li>
+                <li>根据图片主题智能生成视频脚本</li>
+                <li>自动匹配最合适的转场和动画效果</li>
+                <li>背景音乐与画面节奏智能匹配</li>
+            </ul>
+        </div>
+        ''')
         
         # Action buttons
-        btn = gr.Button("🎬 生成视频", variant="primary", size="lg")
+        btn = gr.Button("🎬 生成AI视频", variant="primary", size="lg")
         
         # Loading and output sections
         loading_output = gr.HTML(value="")
@@ -419,10 +399,6 @@ def create_video_editor_section() -> Dict[str, Any]:
     return {
         'images_input': images_input,
         'audio_input': audio_input,
-        'fps': fps,
-        'duration_per_image': duration_per_image,
-        'transition_duration': transition_duration,
-        'animation_type': animation_type,
         'button': btn,
         'loading_output': loading_output,
         'result_message': result_message,

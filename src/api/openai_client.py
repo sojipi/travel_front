@@ -1,18 +1,27 @@
 """
 OpenAI API client module for the travel assistant application.
-Handles all API communications with the AI model.
+Handles all API communications with the AI model, including ModelScope API.
 """
 
 import openai
-from typing import Optional, Dict, Any
+import base64
+from typing import Optional, Dict, Any, List
 try:
-    from ..config.config import API_KEY, API_BASE, MODEL_NAME, MAX_TOKENS, TEMPERATURE
+    from ..config.config import (
+        API_KEY, API_BASE, MODEL_NAME, MAX_TOKENS, TEMPERATURE,
+        MODELSCOPE_API_KEY, MODELSCOPE_BASE_URL,
+        QWEN_MODEL_NAME, DEEPSEEK_MODEL_NAME
+    )
 except ImportError:
     # Handle direct execution
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from config.config import API_KEY, API_BASE, MODEL_NAME, MAX_TOKENS, TEMPERATURE
+    from config.config import (
+        API_KEY, API_BASE, MODEL_NAME, MAX_TOKENS, TEMPERATURE,
+        MODELSCOPE_API_KEY, MODELSCOPE_BASE_URL,
+        QWEN_MODEL_NAME, DEEPSEEK_MODEL_NAME
+    )
 
 
 class OpenAIClient:
@@ -37,15 +46,19 @@ class OpenAIClient:
                          system_prompt: str, 
                          user_prompt: str, 
                          max_tokens: Optional[int] = None,
-                         temperature: Optional[float] = None) -> str:
+                         temperature: Optional[float] = None,
+                         model_name: Optional[str] = None,
+                         use_modelscope: bool = False) -> str:
         """
-        Generate a response using the OpenAI API.
+        Generate a response using the OpenAI API or ModelScope API.
         
         Args:
             system_prompt: The system prompt to guide the AI behavior
             user_prompt: The user's input prompt
             max_tokens: Maximum tokens for the response (overrides default)
             temperature: Temperature for response generation (overrides default)
+            model_name: Name of the model to use (overrides default)
+            use_modelscope: Whether to use ModelScope API instead of OpenAI API
             
         Returns:
             The generated response text
@@ -54,8 +67,19 @@ class OpenAIClient:
             Exception: If API call fails
         """
         try:
-            response = self.client.chat.completions.create(
-                model=MODEL_NAME,
+            # Determine which API to use
+            if use_modelscope:
+                client = openai.OpenAI(
+                    api_key=MODELSCOPE_API_KEY,
+                    base_url=MODELSCOPE_BASE_URL
+                )
+                model = model_name or QWEN_MODEL_NAME
+            else:
+                client = self.client
+                model = model_name or MODEL_NAME
+            
+            response = client.chat.completions.create(
+                model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -218,6 +242,120 @@ class OpenAIClient:
 """
         
         return self.generate_response(CHECKLIST_SYSTEM_PROMPT, user_prompt)
+
+
+    def analyze_images(self, images: List[str]) -> List[str]:
+        """
+        Analyze images using Qwen3-VL model to generate descriptions.
+        
+        Args:
+            images: List of image file paths to analyze
+            
+        Returns:
+            List of image descriptions
+            
+        Raises:
+            Exception: If image analysis fails
+        """
+        try:
+            image_descriptions = []
+            
+            for img_path in images:
+                # Read and encode image to base64
+                with open(img_path, "rb") as img_file:
+                    img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+                
+                # Create client for ModelScope API
+                client = openai.OpenAI(
+                    api_key=MODELSCOPE_API_KEY,
+                    base_url=MODELSCOPE_BASE_URL
+                )
+                
+                # Generate image description using Qwen3-VL
+                response = client.chat.completions.create(
+                    model=QWEN_MODEL_NAME,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "请详细描述这张图片的内容，包括场景、物体、颜色、氛围等信息，为视频制作提供参考。"
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{img_base64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=512,
+                    temperature=0.3
+                )
+                
+                description = response.choices[0].message.content.strip()
+                image_descriptions.append(description)
+            
+            return image_descriptions
+        except Exception as e:
+            raise Exception(f"图片分析失败: {str(e)}")
+    
+    def generate_video_script(self, image_descriptions: List[str], audio_path: Optional[str] = None) -> str:
+        """
+        Generate a video script based on image descriptions and optional audio.
+        
+        Args:
+            image_descriptions: List of image descriptions
+            audio_path: Optional path to audio file for context
+            
+        Returns:
+            Generated video script
+            
+        Raises:
+            Exception: If script generation fails
+        """
+        try:
+            system_prompt = """
+你是一个专业的视频脚本创作助手。请根据提供的图片描述和背景音乐信息，生成一个富有创意和情感的视频脚本。
+
+脚本要求：
+1. 结构清晰：包含开场、主体、结尾三个部分
+2. 画面描述：详细说明每个画面的内容、镜头运动、时长
+3. 音乐配合：说明音乐与画面的配合方式
+4. 情感表达：通过画面和音乐的结合传递情感
+5. 节奏合理：画面切换和音乐节奏相匹配
+6. 参数明确：在脚本中明确指出以下视频参数：
+   - FPS（帧率）
+   - 单张图片显示时长（秒）
+   - 转场时长（秒）
+   - 动画效果类型（fade、zoom、pan等）
+
+请用中文创作，语言生动，富有感染力。
+            """
+            
+            # Format image descriptions
+            formatted_descriptions = "\n".join([f"图片{i+1}: {desc}" for i, desc in enumerate(image_descriptions)])
+            
+            # Add audio information if provided
+            audio_info = f"\n\n背景音乐：{audio_path}" if audio_path else ""
+            
+            user_prompt = f"请根据以下图片分析结果生成视频脚本：\n\n{formatted_descriptions}{audio_info}"
+            
+            # Generate the video script using DeepSeek model
+            script = self.generate_response(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=2048,
+                temperature=0.7,
+                model_name=DEEPSEEK_MODEL_NAME,
+                use_modelscope=True
+            )
+            
+            return script
+        except Exception as e:
+            raise Exception(f"视频脚本生成失败: {str(e)}")
 
 
 # Global client instance

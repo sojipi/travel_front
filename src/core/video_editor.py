@@ -5,9 +5,19 @@ Contains functions for creating videos from images with audio and effects.
 
 import os
 import tempfile
+import re
+import sys
 from typing import List, Optional, Dict, Any
 import moviepy.editor as mpy
 from moviepy.video.fx.all import fadein, fadeout
+
+# Add the src directory to Python path
+src_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+# Import AI client
+from api.openai_client import OpenAIClient
 
 
 def validate_media_files(images: List[str], audio: Optional[str] = None) -> Dict[str, Any]:
@@ -182,3 +192,111 @@ def create_video_from_images(
         
     except Exception as e:
         raise RuntimeError(f"视频制作失败: {str(e)}") from e
+
+
+def create_ai_video(
+    images: List[str],
+    audio: Optional[str] = None,
+    target_width: int = 720,
+    target_height: int = 1280
+) -> Dict[str, Any]:
+    """
+    Create a video using AI to analyze images and generate a script.
+    
+    Args:
+        images: List of image file paths
+        audio: Optional audio file path
+        target_width: Target video width
+        target_height: Target video height
+        
+    Returns:
+        Dict with video path and generated script
+        
+    Raises:
+        Exception: If any step of the AI video creation fails
+    """
+    try:
+        # Validate input files
+        validation = validate_media_files(images, audio)
+        if not validation['valid']:
+            raise ValueError(f"输入验证失败: {', '.join(validation['errors'])}")
+        
+        # Initialize AI client
+        ai_client = OpenAIClient()
+        
+        # Step 1: Analyze images using Qwen3-VL model
+        image_descriptions = ai_client.analyze_images(images)
+        
+        # Step 2: Generate video script based on image descriptions
+        video_script = ai_client.generate_video_script(image_descriptions, audio)
+        
+        # Step 3: Parse the script to extract video parameters
+        video_params = parse_video_script(video_script)
+        
+        # Step 4: Create video using the extracted parameters
+        video_path = create_video_from_images(
+            images=images,
+            audio=audio,
+            **video_params,
+            target_width=target_width,
+            target_height=target_height
+        )
+        
+        return {
+            'video_path': video_path,
+            'script': video_script,
+            'image_descriptions': image_descriptions
+        }
+        
+    except Exception as e:
+        raise RuntimeError(f"AI视频制作失败: {str(e)}") from e
+
+
+def parse_video_script(script: str) -> Dict[str, Any]:
+    """
+    Parse the video script to extract parameters for video creation.
+    
+    Args:
+        script: Generated video script
+        
+    Returns:
+        Dict with video parameters (fps, duration_per_image, etc.)
+    """
+    # Default parameters
+    params = {
+        'fps': 24,
+        'duration_per_image': 3.0,
+        'transition_duration': 0.5,
+        'animation_type': 'fade'
+    }
+    
+    # Try to extract parameters from script
+    try:
+        # Extract duration per image (looking for patterns like "3秒" or "2.5秒")
+        duration_match = re.search(r'(\d+\.?\d*)[秒|s]', script)
+        if duration_match:
+            params['duration_per_image'] = float(duration_match.group(1))
+        
+        # Extract transition duration
+        transition_match = re.search(r'过渡[为|时长|时间]?(\d+\.?\d*)[秒|s]', script)
+        if transition_match:
+            params['transition_duration'] = float(transition_match.group(1))
+        
+        # Extract animation type (fade, zoom, pan, etc.)
+        if '淡入淡出' in script or '渐变' in script:
+            params['animation_type'] = 'fade'
+        elif '缩放' in script or '放大' in script or '缩小' in script:
+            params['animation_type'] = 'zoom'
+        elif '平移' in script or '移动' in script or '摇镜头' in script:
+            params['animation_type'] = 'pan'
+        
+        # Extract FPS if mentioned
+        fps_match = re.search(r'(\d+)fps|(\d+)FPS', script)
+        if fps_match:
+            params['fps'] = int(fps_match.group(1) or fps_match.group(2))
+            
+    except Exception as e:
+        # If parsing fails, use default parameters
+        print(f"脚本解析失败，使用默认参数: {str(e)}")
+    
+    return params

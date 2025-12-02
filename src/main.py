@@ -17,7 +17,7 @@ try:
         generate_itinerary_plan,
         generate_checklist
     )
-    from .core.video_editor import create_video_from_images, validate_media_files
+    from .core.video_editor import create_ai_video, validate_media_files
     from .ui.components import (
         create_app_theme,
         create_header,
@@ -37,7 +37,7 @@ except ImportError:
         generate_itinerary_plan,
         generate_checklist
     )
-    from core.video_editor import create_video_from_images, validate_media_files
+    from core.video_editor import create_ai_video, validate_media_files
     from ui.components import (
         create_app_theme,
         create_header,
@@ -182,7 +182,7 @@ def create_app() -> gr.Blocks:
             video_section = create_video_editor_section()
             
             # Bind video generation events
-            def generate_video(images, audio, fps, duration_per_image, transition_duration, animation_type):
+            def generate_video(images, audio):
                 try:
                     # Validate inputs
                     if not images:
@@ -192,33 +192,26 @@ def create_app() -> gr.Blocks:
                     image_paths = [img.name for img in images]
                     audio_path = audio.name if audio else None
                     
-                    # Create video - 使用适合手机的9:16竖屏比例
-                    video_path = create_video_from_images(
+                    # Create AI video - 使用适合手机的9:16竖屏比例
+                    video_result = create_ai_video(
                         image_paths,
                         audio_path,
-                        fps,
-                        duration_per_image,
-                        transition_duration,
-                        animation_type,
                         target_width=720,
                         target_height=1280  # 9:16 竖屏比例，适合手机播放
                     )
                     
-                    return "", f"视频生成成功！", video_path, video_path
+                    video_path = video_result['video_path']
+                    return "", f"AI视频生成成功！", video_path, video_path
                     
                 except Exception as e:
-                    error_msg = f"视频生成失败: {str(e)}"
+                    error_msg = f"AI视频生成失败: {str(e)}"
                     return "", error_msg, None, ""
             
             video_section['button'].click(
                 fn=generate_video,
                 inputs=[
                     video_section['images_input'],
-                    video_section['audio_input'],
-                    video_section['fps'],
-                    video_section['duration_per_image'],
-                    video_section['transition_duration'],
-                    video_section['animation_type']
+                    video_section['audio_input']
                 ],
                 outputs=[
                     video_section['loading_output'],
@@ -267,7 +260,7 @@ def main():
     # Launch the application
     app.launch(
         server_name="0.0.0.0",
-        server_port=7860,
+        server_port=7861,
         share=False,
         inbrowser=True,
         debug=False
