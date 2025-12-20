@@ -4,6 +4,7 @@ import DestinationRecommendation from './components/DestinationRecommendation'
 import ItineraryPlan from './components/ItineraryPlan'
 import TravelChecklist from './components/TravelChecklist'
 import VideoEditor from './components/VideoEditor'
+import SmartTourGuide from './components/SmartTourGuide'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <button onClick={(event) => showTab('itinerary', event)}>📋 行程规划</button>
         <button onClick={(event) => showTab('checklist', event)}>🎁 旅行清单</button>
         <button onClick={(event) => showTab('video', event)}>🎬 视频制作</button>
+        <button onClick={(event) => showTab('tour-guide', event)}>🧭 智能导游</button>
       </nav>
       <main className="App-main">
         <div id="destination" className="tab active">
@@ -30,6 +32,9 @@ function App() {
         </div>
         <div id="video" className="tab">
           <VideoEditor />
+        </div>
+        <div id="tour-guide" className="tab">
+          <SmartTourGuide />
         </div>
       </main>
     </div>

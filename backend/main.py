@@ -22,6 +22,8 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 from core.travel_functions import generate_destination_recommendation, generate_itinerary_plan, generate_checklist
+from api.openai_client import OpenAIClient
+import pyttsx3
 
 app = FastAPI(title="银发族智能旅行助手 API", version="1.0.0")
 
@@ -164,6 +166,50 @@ async def health_assessment():
         return {
             "result": "健康评估结果：您的身体状况良好，可以进行适度的旅行。建议携带常用药物，避免过度劳累。"
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 智能导游API - 获取附近POI
+@app.get("/api/tour-guide/pois")
+async def get_nearby_pois(lng: float, lat: float, radius: int = 1000):
+    try:
+        # 这里应该调用高德地图API获取POI数据
+        # 暂时使用模拟数据
+        pois = [
+            {"id": "1", "name": "故宫博物院", "type": "旅游景点", "lng": 116.3970, "lat": 39.9087, "address": "北京市东城区景山前街4号"},
+            {"id": "2", "name": "天安门广场", "type": "旅游景点", "lng": 116.4038, "lat": 39.9042, "address": "北京市东城区天安门广场"},
+            {"id": "3", "name": "颐和园", "type": "旅游景点", "lng": 116.2750, "lat": 39.9917, "address": "北京市海淀区新建宫门路19号"}
+        ]
+        return {"pois": pois}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 智能导游API - 获取导游讲解词
+@app.get("/api/tour-guide/explanation")
+async def get_tour_explanation(poi_name: str):
+    try:
+        client = OpenAIClient()
+        system_prompt = "你是一个专业的导游，为银发族游客提供详细、生动的景点讲解。讲解内容要通俗易懂，富有感染力，同时考虑老年人的特点，语速适中，重点突出历史文化和景点特色。"
+        user_prompt = f"请为{poi_name}编写一段导游讲解词，适合银发族游客。讲解要详细介绍景点的历史背景、主要特色和参观要点。"
+        explanation = client.generate_response(system_prompt, user_prompt, use_modelscope=True)
+        return {"explanation": explanation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 智能导游API - 播放导游词（TTS）
+@app.get("/api/tour-guide/play-audio")
+async def play_tour_audio(text: str):
+    try:
+        # 初始化TTS引擎
+        engine = pyttsx3.init()
+        # 设置语速
+        engine.setProperty('rate', 150)
+        # 设置音量
+        engine.setProperty('volume', 0.9)
+        # 播放文本
+        engine.say(text)
+        engine.runAndWait()
+        return {"message": "音频播放完成"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
