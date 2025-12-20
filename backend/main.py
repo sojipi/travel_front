@@ -22,6 +22,8 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 from core.travel_functions import generate_destination_recommendation, generate_itinerary_plan, generate_checklist
+from api.openai_client import OpenAIClient
+import pyttsx3
 
 app = FastAPI(title="银发族智能旅行助手 API", version="1.0.0")
 
@@ -176,6 +178,70 @@ async def safety_tips():
         return {
             "result": "旅行安全提示：\n1. 携带身份证和老年证\n2. 随身携带常用药物\n3. 注意饮食卫生\n4. 避免单独行动\n5. 保持手机电量充足\n6. 告知家人旅行计划"
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+import requests
+
+# 智能导游API - 获取附近POI
+@app.get("/api/tour-guide/pois")
+async def get_nearby_pois(lng: float, lat: float, radius: int = 1000):
+    try:
+        # 调用高德地图API获取POI数据
+        # 需要在环境变量或配置文件中设置高德地图API密钥
+        import os
+        amap_key = os.getenv('AMAP_API_KEY', 'b4923780b9c443fc43ca4dc7cc4d8eb4')  # 默认使用前端配置的密钥
+        
+        # 高德地图POI搜索API
+        url = f"https://restapi.amap.com/v3/place/around?key={amap_key}&location={lng},{lat}&radius={radius}&types=110000&output=json"
+        
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get('status') == '1':
+            pois = []
+            for poi in data.get('pois', []):
+                pois.append({
+                    "id": poi.get('id'),
+                    "name": poi.get('name'),
+                    "type": poi.get('type'),
+                    "lng": float(poi.get('location').split(',')[0]),
+                    "lat": float(poi.get('location').split(',')[1]),
+                    "address": poi.get('address', '')
+                })
+            return {"pois": pois}
+        else:
+            raise HTTPException(status_code=500, detail=f"高德地图API请求失败: {data.get('info', '未知错误')}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 智能导游API - 获取导游讲解词
+@app.get("/api/tour-guide/explanation")
+async def get_tour_explanation(poi_name: str):
+    try:
+        client = OpenAIClient()
+        system_prompt = "你是一个专业的导游，为银发族游客提供详细、生动的景点讲解。讲解内容要通俗易懂，富有感染力，同时考虑老年人的特点，语速适中，重点突出历史文化和景点特色。"
+        user_prompt = f"请为{poi_name}编写一段导游讲解词，适合银发族游客。讲解要详细介绍景点的历史背景、主要特色和参观要点。"
+        explanation = client.generate_response(system_prompt, user_prompt, use_modelscope=True)
+        return {"explanation": explanation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 智能导游API - 播放导游词（TTS）
+@app.get("/api/tour-guide/play-audio")
+async def play_tour_audio(text: str):
+    try:
+        # 初始化TTS引擎
+        engine = pyttsx3.init()
+        # 设置语速
+        engine.setProperty('rate', 150)
+        # 设置音量
+        engine.setProperty('volume', 0.9)
+        # 播放文本
+        engine.say(text)
+        engine.runAndWait()
+        return {"message": "音频播放完成"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
