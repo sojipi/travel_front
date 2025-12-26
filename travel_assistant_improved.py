@@ -11,7 +11,7 @@ import re
 # 从环境变量读取API配置（更安全）
 API_KEY = os.getenv('MODEL_API_KEY')
 BASE_URL = "https://api-inference.modelscope.cn/v1/"
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 
 def init_openai_client():
     """初始化OpenAI客户端"""

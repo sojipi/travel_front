@@ -13,6 +13,7 @@ from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeVideoClip
 import tempfile
 import uuid
 import sys
+import httpx
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -21,7 +22,7 @@ load_dotenv()
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-from core.travel_functions import generate_destination_recommendation, generate_itinerary_plan, generate_checklist
+from core.travel_functions import generate_destination_recommendation, generate_itinerary_plan, generate_checklist as create_checklist
 from api.openai_client import OpenAIClient
 import pyttsx3
 
@@ -90,9 +91,9 @@ async def generate_itinerary(request: ItineraryRequest):
 
 # 旅行清单API
 @app.post("/api/generate-checklist")
-async def generate_checklist(request: ChecklistRequest):
+async def generate_checklist_api(request: ChecklistRequest):
     try:
-        result = generate_checklist(
+        result = create_checklist(
             origin=request.origin,
             destination=request.destination,
             duration=request.duration,
@@ -115,8 +116,10 @@ async def create_video(images: List[UploadFile] = File(...), audio: Optional[Upl
                 image_path = os.path.join(temp_dir, f"image_{i}.jpg")
                 with open(image_path, "wb") as f:
                     f.write(await image.read())
-                # 调整图片尺寸
+                # 调整图片尺寸，处理RGBA转RGB
                 with Image.open(image_path) as img:
+                    if img.mode == 'RGBA':
+                        img = img.convert('RGB')
                     img = img.resize((1920, 1080))  # 1080p
                     img.save(image_path, "JPEG")
                 image_paths.append(image_path)
@@ -222,6 +225,37 @@ async def safety_tips():
         return {
             "result": "旅行安全提示：\n1. 携带身份证和老年证\n2. 随身携带常用药物\n3. 注意饮食卫生\n4. 避免单独行动\n5. 保持手机电量充足\n6. 告知家人旅行计划"
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 图片生成代理API - 解决跨域问题
+class ImageGenerationRequest(BaseModel):
+    image_url: str
+    prompt: str
+
+@app.post("/api/generate-cartoon-map")
+async def generate_cartoon_map(request: ImageGenerationRequest):
+    try:
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "qwen-image-edit-plus-2025-10-30",
+                    "input": {
+                        "messages": [{
+                            "role": "user",
+                            "content": [{"image": request.image_url}, {"text": request.prompt}]
+                        }]
+                    },
+                    "parameters": {"n": 1, "negative_prompt": "低质量", "prompt_extend": True, "watermark": False}
+                }
+            )
+            return response.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -9,7 +9,7 @@ from typing import List, Dict
 # API Configuration
 API_KEY = os.getenv("MODEL_API_KEY", "")
 API_BASE = "https://api-inference.modelscope.cn/v1/"
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 MAX_TOKENS = 4096
 TEMPERATURE = 0.7
 
@@ -17,7 +17,7 @@ TEMPERATURE = 0.7
 MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "") or API_KEY
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/"
 QWEN_MODEL_NAME = "Qwen/Qwen3-VL-8B-Instruct"
-DEEPSEEK_MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+DEEPSEEK_MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 
 # Application Settings
 APP_TITLE = "🧳 银发族智能旅行助手"
