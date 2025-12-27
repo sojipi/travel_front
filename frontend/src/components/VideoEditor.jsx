@@ -36,7 +36,7 @@ function VideoEditor() {
       })
       const data = await response.json()
       if (response.ok) {
-        setVideoUrl(data.video_path)
+        setVideoUrl(`http://localhost:8001${data.video_path}`)
         setMessage(data.message)
       } else {
         setMessage(data.error)
@@ -51,10 +51,6 @@ function VideoEditor() {
 
   return (
     <div className="video-editor-section">
-      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '25px', borderRadius: '15px', marginBottom: '20px', textAlign: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '32px' }}>🎬 视频制作</h2>
-        <p style={{ margin: '10px 0 0 0', fontSize: '16px' }}>将您的旅行照片制作成精彩的视频</p>
-      </div>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label style={{ fontSize: '18px', marginBottom: '10px', display: 'block', textAlign: 'left' }}>🖼️ 上传图片</label>

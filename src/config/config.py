@@ -9,7 +9,7 @@ from typing import List, Dict
 # API Configuration
 API_KEY = os.getenv("MODEL_API_KEY", "")
 API_BASE = "https://api-inference.modelscope.cn/v1/"
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 MAX_TOKENS = 4096
 TEMPERATURE = 0.7
 
@@ -17,7 +17,7 @@ TEMPERATURE = 0.7
 MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "") or API_KEY
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/"
 QWEN_MODEL_NAME = "Qwen/Qwen3-VL-8B-Instruct"
-DEEPSEEK_MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+DEEPSEEK_MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 
 # Application Settings
 APP_TITLE = "🧳 银发族智能旅行助手"
@@ -61,6 +61,8 @@ DESTINATION_SYSTEM_PROMPT = """你是一个专为银发族设计的智能旅行�
 4. 实用性强：推荐的目的地切实可行，便于实施
 
 请根据用户提供的季节、健康状况、预算范围和兴趣偏好，推荐3-5个适合银发族的国内旅行目的地。
+
+**重要：你必须使用Markdown格式返回内容，包括标题、列表、粗体等Markdown语法。不要使用JSON格式或其他格式。**
 """
 
 ITINERARY_SYSTEM_PROMPT = """你是一个专为银发族设计的智能行程规划助手。你具有以下特点：
@@ -71,6 +73,8 @@ ITINERARY_SYSTEM_PROMPT = """你是一个专为银发族设计的智能行程规
 5. 实用便利：考虑交通、住宿、餐饮的便利性
 
 请根据用户的目的地、旅行时长、行动能力和健康关注点，制定一份详细的、适合银发族的旅行行程计划。
+
+**重要：你必须使用Markdown格式返回内容，包括标题、列表、粗体等Markdown语法。不要使用JSON格式或其他格式。**
 """
 
 CHECKLIST_SYSTEM_PROMPT = """你是一个专为银发族设计的旅行清单助手。你具有以下特点：
@@ -81,6 +85,8 @@ CHECKLIST_SYSTEM_PROMPT = """你是一个专为银发族设计的旅行清单助
 5. 个性化：根据用户的特殊需求定制清单
 
 请根据用户的出发地、目的地、旅行时长和特殊需求，生成一份详细的、适合银发族的旅行清单。
+
+**重要：你必须返回纯JSON格式的数据，不要包含任何额外的文字说明，不要使用Markdown代码块标记（不要使用```json或```），直接返回JSON数据即可。**
 """
 
 # Default Values

@@ -131,6 +131,8 @@ class OpenAIClient:
 - 安全因素
 
 请用温暖、耐心的语气，像对待长辈一样详细说明每个推荐地的特点。
+
+**重要：请使用Markdown格式返回内容，使用#、##、###等标题符号，使用-或1.列表符号，使用**粗体**等Markdown语法。不要使用任何JSON格式。**
 """
         
         return self.generate_response(DESTINATION_SYSTEM_PROMPT, user_prompt)
@@ -174,8 +176,10 @@ class OpenAIClient:
 - 注意事项
 - 应急准备
 
-请特别考虑银发族的特点，安排充足的休息时间，避免过于紧凑的行程。
-请用温暖、关怀的语气，像为父母规划旅行一样细心周到。
+请特别考虑银发族自己的特点，安排充足的休息时间，避免过于紧凑的行程。
+请用温暖、关怀的语气，为银发族自己规划旅行，让旅行舒适安全。
+
+**重要：请使用Markdown格式返回内容，使用#、##、###等标题符号，使用-或1.列表符号，使用**粗体**等Markdown语法。不要使用任何JSON格式。**
 """
         
         return self.generate_response(ITINERARY_SYSTEM_PROMPT, user_prompt)
@@ -184,7 +188,8 @@ class OpenAIClient:
                           origin: str, 
                           destination: str, 
                           duration: str, 
-                          special_needs: str,
+                          departure_date: str = "",
+                          special_needs: str = "",
                           itinerary_text: str = "") -> str:
         """
         Generate a comprehensive travel checklist.
@@ -193,6 +198,7 @@ class OpenAIClient:
             origin: Departure location
             destination: Travel destination
             duration: Trip duration
+            departure_date: Departure date
             special_needs: Special requirements
             itinerary_text: Optional itinerary text for context
             
@@ -206,6 +212,18 @@ class OpenAIClient:
         
         itinerary_context = f"\n参考行程：{itinerary_text}" if itinerary_text else ""
         
+        # Add booking dates information if departure date is provided
+        booking_dates_info = ""
+        if departure_date:
+            booking_dates_info = f"""
+5. 出发日期：{departure_date}
+
+重要提醒：
+- 机票/火车票：请提前购买，建议购买{departure_date}当天的票
+- 酒店预订：请预订{departure_date}入住的酒店，根据{duration}时长选择退房日期
+- 景点门票：请提前预订{departure_date}之后的门票，避免现场排队
+"""
+        
         user_prompt = f"""
 请为银发族生成一份详细的旅行清单：
 
@@ -213,6 +231,7 @@ class OpenAIClient:
 2. 目的地：{destination}
 3. 旅行时长：{duration}
 4. 特殊需求：{special_needs}
+{booking_dates_info}
 {itinerary_context}
 
 请生成一份详细的旅行清单，包括：
@@ -226,19 +245,30 @@ class OpenAIClient:
 - 娱乐用品
 - 特殊用品（根据健康状况）
 
-请用JSON格式返回，包含以下字段：
-- documents: 证件类清单
-- clothing: 衣物类清单
-- medications: 药品类清单
-- daily_items: 生活用品清单
-- electronics: 电子设备清单
-- financial: 财务准备清单
-- safety: 安全用品清单
-- entertainment: 娱乐用品清单
-- special_items: 特殊用品清单
-- tips: 温馨提示列表
+请严格按照JSON格式返回，必须包含以下所有字段：
+- documents: 数组，包含证件类清单项
+- clothing: 数组，包含衣物类清单项
+- medications: 数组，包含药物类清单项
+- daily_items: 数组，包含生活用品清单项
+- electronics: 数组，包含电子设备清单项
+- financial: 数组，包含财务准备清单项
+- safety: 数组，包含安全用品清单项
+- entertainment: 数组，包含娱乐用品清单项
+- special_items: 数组，包含特殊用品清单项
+- booking_guides: 对象，必须包含transport、hotel、tickets三个子对象
+  - transport: 对象，包含title(机票/火车票预订)、platforms(数组)、notes(数组)
+  - hotel: 对象，包含title(酒店预订)、platforms(数组)、notes(数组)
+  - tickets: 对象，包含title(景点门票)、platforms(数组)、notes(数组)
+- tips: 数组，包含温馨提示
+
+**重要要求：**
+1. 必须返回booking_guides字段，且包含transport、hotel、tickets三个分类，每个分类必须有title、platforms、notes三个子字段
+2. 所有数组类型的字段必须包含至少1个元素
+3. 不要使用任何代码块标记（如或```），直接返回纯JSON数据
 
 请用温暖、细致的语气，像为父母准备行李一样周到贴心。
+
+**重要：请返回纯JSON格式的数据，不要包含任何额外的文字说明，不要使用Markdown代码块标记（不要使用```json或```），直接返回JSON数据即可。**
 """
         
         return self.generate_response(CHECKLIST_SYSTEM_PROMPT, user_prompt)

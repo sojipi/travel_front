@@ -1,13 +1,26 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import html2pdf from 'html2pdf.js'
 
-function TravelChecklist() {
+function TravelChecklist({ importedItinerary, importedDestination }) {
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [duration, setDuration] = useState('一周左右')
+  const [departureDate, setDepartureDate] = useState('')
   const [needs, setNeeds] = useState('')
   const [itinerary, setItinerary] = useState('')
   const [checklist, setChecklist] = useState('')
   const [loading, setLoading] = useState(false)
+  const checklistRef = useRef(null)
+
+  // 当接收到导入的数据时，自动填充表单
+  useEffect(() => {
+    if (importedItinerary) {
+      setItinerary(importedItinerary)
+    }
+    if (importedDestination) {
+      setDestination(importedDestination)
+    }
+  }, [importedItinerary, importedDestination])
 
   const durationOptions = ['3-5天', '一周左右', '10-15天', '15天以上']
 
@@ -20,7 +33,14 @@ function TravelChecklist() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ origin, destination, duration, needs, itinerary_content: itinerary }),
+        body: JSON.stringify({ 
+          origin, 
+          destination, 
+          duration, 
+          departure_date: departureDate,
+          needs, 
+          itinerary_content: itinerary 
+        }),
       })
       const data = await response.json()
       setChecklist(data.result)
@@ -32,12 +52,21 @@ function TravelChecklist() {
     }
   }
 
+  const exportToPDF = () => {
+    if (!checklistRef.current) return
+    const element = checklistRef.current
+    const opt = {
+      margin: 10,
+      filename: `旅行清单-${destination || '未命名'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+    html2pdf().set(opt).from(element).save()
+  }
+
   return (
     <div className="checklist-section">
-      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '25px', borderRadius: '15px', marginBottom: '20px', textAlign: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '32px' }}>🎁 旅行清单</h2>
-        <p style={{ margin: '10px 0 0 0', fontSize: '16px' }}>根据您的需求生成详细的旅行清单</p>
-      </div>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label style={{ fontSize: '18px', marginBottom: '10px', display: 'block', textAlign: 'left' }}>🏠 出发地</label>
@@ -58,6 +87,15 @@ function TravelChecklist() {
             placeholder="请输入旅行目的地" 
             style={{ width: '100%', padding: '12px', fontSize: '16px', borderRadius: '10px', border: '1px solid #ddd', marginBottom: '20px' }}
             required
+          />
+        </div>
+        <div className="form-group">
+          <label style={{ fontSize: '18px', marginBottom: '10px', display: 'block', textAlign: 'left' }}>📅 出发日期</label>
+          <input 
+            type="date" 
+            value={departureDate} 
+            onChange={(e) => setDepartureDate(e.target.value)}
+            style={{ width: '100%', padding: '12px', fontSize: '16px', borderRadius: '10px', border: '1px solid #ddd', marginBottom: '20px' }}
           />
         </div>
         <div className="form-group">
@@ -101,11 +139,29 @@ function TravelChecklist() {
       {checklist && (
         <div style={{ marginTop: '30px' }}>
           <label style={{ fontSize: '18px', marginBottom: '10px', display: 'block', textAlign: 'left' }}>🎁 清单结果</label>
-          <textarea 
-            value={checklist} 
-            readOnly 
-            style={{ width: '100%', padding: '20px', fontSize: '16px', borderRadius: '10px', border: '1px solid #ddd', minHeight: '300px', resize: 'vertical' }}
+          <div
+            ref={checklistRef}
+            dangerouslySetInnerHTML={{ __html: checklist }}
+            style={{ width: '100%', padding: '20px', fontSize: '16px', borderRadius: '10px', border: '1px solid #ddd', minHeight: '300px', background: '#fff', lineHeight: '1.8' }}
           />
+          <button
+            onClick={exportToPDF}
+            style={{
+              marginTop: '15px',
+              background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              fontSize: '16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            📄 导出PDF
+          </button>
         </div>
       )}
     </div>
