@@ -1,0 +1,73 @@
+# ============================================
+# Docker忽略文件
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.log
+
+# 前端构建产物
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量（不要提交到Docker镜像）
+.env.local
+.env.*.local
+
+# 测试文件
+test_*.py
+*.test.js
+*.test.jsx
+tests/
+
+# Git
+.git/
+.gitignore
+
+# 文档
+README.md
+使用说明.md
+Windows启动指南.txt
+
+# 临时文件
+*.tmp
+*.bak
+*.backup
+
+# Docker文件
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 生成的文件（静态文件会在容器运行时创建）
+generated_videos/
+checklist_data/
+
+# 其他
+.cache/
+coverage/
+.nyc_output/

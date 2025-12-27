@@ -113,7 +113,8 @@ def generate_itinerary_plan(destination: str,
 def generate_checklist(origin: str, 
                       destination: str, 
                       duration: str, 
-                      special_needs: str,
+                      departure_date: str = "",
+                      special_needs: str = "",
                       itinerary_text: str = "") -> str:
     """
     Generate a comprehensive travel checklist.
@@ -122,6 +123,7 @@ def generate_checklist(origin: str,
         origin: Departure location
         destination: Travel destination
         duration: Trip duration
+        departure_date: Departure date (optional)
         special_needs: Special requirements
         itinerary_text: Optional itinerary for context
         
@@ -152,6 +154,7 @@ def generate_checklist(origin: str,
             origin=origin,
             destination=destination,
             duration=duration,
+            departure_date=departure_date,
             special_needs=special_needs,
             itinerary_text=itinerary_text
         )
@@ -159,7 +162,7 @@ def generate_checklist(origin: str,
         # Parse JSON response and format as HTML
         checklist_data = safe_json_parse(response)
         if checklist_data:
-            return format_checklist_html(checklist_data)
+            return format_checklist_html(checklist_data, departure_date, origin, destination, duration)
         else:
             # Fallback to text formatting
             return format_checklist_text(response)
@@ -168,21 +171,40 @@ def generate_checklist(origin: str,
         return f"抱歉，生成清单时出现了错误: {str(e)}"
 
 
-def format_checklist_html(data: Dict[str, Any]) -> str:
+def format_checklist_html(data: Dict[str, Any], departure_date: str = "", origin: str = "", destination: str = "", duration: str = "") -> str:
     """
     Format checklist data as HTML.
     
     Args:
         data: Parsed checklist data
+        departure_date: Departure date
+        origin: Departure location
+        destination: Travel destination
+        duration: Trip duration
         
     Returns:
         HTML formatted checklist
     """
-    html = """
+    # Generate booking dates based on departure date and duration
+    booking_dates = generate_booking_dates(departure_date, duration)
+    
+    trip_info = ""
+    if origin or destination:
+        trip_info = f"<p style='color: #95a5a6; font-size: 14px; margin: 5px 0;'>"
+        if origin and destination:
+            trip_info += f"{origin} → {destination}"
+        if duration:
+            trip_info += f" | {duration}"
+        if departure_date:
+            trip_info += f" | 出发：{departure_date}"
+        trip_info += "</p>"
+    
+    html = f"""
     <div style="font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; max-width: 800px; margin: 0 auto; background: #fafafa; padding: 20px; border-radius: 15px;">
         <div style="text-align: center; margin-bottom: 30px;">
             <h1 style="color: #2c3e50; font-size: 32px; margin-bottom: 10px;">🎁 专属旅行清单</h1>
             <p style="color: #7f8c8d; font-size: 16px;">为您的旅行做好充分准备</p>
+            {trip_info}
         </div>
     """
     
@@ -231,10 +253,10 @@ def format_checklist_html(data: Dict[str, Any]) -> str:
     if special_items:
         html += create_checklist_section("⭐ 特殊用品", special_items, "#fdedec", "#e91e63")
     
-    # Booking guides
+    # Booking guides with dates - always show if we have dates
     booking_guides = data.get("booking_guides", {})
-    if booking_guides:
-        html += create_booking_guides_section(booking_guides)
+    if booking_dates.get('departure_date') or booking_guides:
+        html += create_booking_guides_section(booking_guides, booking_dates)
     
     # Tips
     tips = data.get("tips", [])
@@ -271,29 +293,135 @@ def create_checklist_section(title: str, items: List[str], bg_color: str, title_
     return html
 
 
-def create_booking_guides_section(booking_guides: Dict[str, Any]) -> str:
+def create_booking_guides_section(booking_guides: Dict[str, Any], booking_dates: Dict[str, str]) -> str:
     """Create booking guides section HTML."""
     html = """
     <div style="background: #fff3e0; padding: 20px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid #e65100;">
         <h3 style="margin: 0 0 15px 0; color: #e65100; font-size: 20px;">🎫 预订指南</h3>
     """
     
-    for category, info in booking_guides.items():
-        if isinstance(info, dict):
-            html += f'<h4 style="color: #f57c00; margin: 10px 0 5px 0;">{info.get("title", category)}</h4>'
+    # Add date information
+    if booking_dates.get('departure_date'):
+        html += f"""
+        <div style="background: #ffe8cc; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+            <p style="margin: 5px 0; color: #e65100; font-size: 15px; font-weight: 500;">
+                📅 出发日期：<strong>{booking_dates['departure_date']}</strong>
+            </p>
+            <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                🏠 住宿日期：{booking_dates['check_in_date']} 至 {booking_dates['check_out_date']}
+            </p>
+        </div>
+        """
+    
+    # Display booking guides if available
+    if booking_guides and len(booking_guides) > 0:
+        for category, info in booking_guides.items():
+            if isinstance(info, dict):
+                html += f'<h4 style="color: #f57c00; margin: 10px 0 5px 0;">{info.get("title", category)}</h4>'
+                
+                platforms = info.get('platforms', [])
+                if platforms:
+                    html += '<ul style="margin: 5px 0; padding-left: 20px; color: #555;">'
+                    for platform in platforms:
+                        html += f'<li style="margin-bottom: 5px;">{platform}</li>'
+                    html += '</ul>'
+                
+                notes = info.get('notes', [])
+                if notes:
+                    html += '<ul style="margin: 5px 0; padding-left: 20px; color: #666;">'
+                    for note in notes:
+                        html += f'<li style="margin-bottom: 5px;">{note}</li>'
+                    html += '</ul>'
+    else:
+        # Default booking guides if AI doesn't provide
+        html += """
+        <div style="background: #fff; padding: 15px; border-radius: 6px; margin-top: 10px;">
+            <h4 style="color: #f57c00; margin: 10px 0 5px 0;">✈️ 机票/火车票预订</h4>
+            <ul style="margin: 5px 0; padding-left: 20px; color: #555;">
+                <li style="margin-bottom: 5px;">推荐平台：12306（铁路）、携程、去哪儿、飞猪、同程</li>
+                <li style="margin-bottom: 5px;">预订时间：提前7-15天预订优惠更大</li>
+                <li style="margin-bottom: 5px;">注意事项：确认出行日期和证件有效期，保留电子票据</li>
+            </ul>
             
-            platforms = info.get('platforms', [])
-            if platforms:
-                html += '<ul style="margin: 5px 0; padding-left: 20px; color: #555;">'
-                for platform in platforms:
-                    html += f'<li style="margin-bottom: 5px;">{platform}</li>'
-                html += '</ul>'
+            <h4 style="color: #f57c00; margin: 10px 0 5px 0;">🏨 酒店预订</h4>
+            <ul style="margin: 5px 0; padding-left: 20px; color: #555;">
+                <li style="margin-bottom: 5px;">推荐平台：携程、美团、飞猪、去哪儿、Booking</li>
+                <li style="margin-bottom: 5px;">预订建议：选择靠近景点或市中心的酒店，考虑无障碍设施</li>
+                <li style="margin-bottom: 5px;">注意事项：确认入住和退房时间，查看取消政策</li>
+            </ul>
+            
+            <h4 style="color: #f57c00; margin: 10px 0 5px 0;">🎟️ 景点门票</h4>
+            <ul style="margin: 5px 0; padding-left: 20px; color: #555;">
+                <li style="margin-bottom: 5px;">推荐平台：携程、美团、同程、景区官网</li>
+                <li style="margin-bottom: 5px;">提前购票：提前1-3天预订热门景点门票，避免排队</li>
+                <li style="margin-bottom: 5px;">优惠政策：老年证、学生证、军人证可能有优惠</li>
+            </ul>
+        </div>
+        """
     
     html += """
     </div>
     """
     
     return html
+
+
+def generate_booking_dates(departure_date: str, duration: str) -> Dict[str, str]:
+    """
+    Generate booking dates based on departure date and duration.
+    
+    Args:
+        departure_date: Departure date in YYYY-MM-DD format
+        duration: Trip duration (e.g., '3-5天', '一周左右', '10-15天', '15天以上')
+        
+    Returns:
+        Dictionary containing booking dates
+    """
+    if not departure_date:
+        return {
+            'departure_date': '',
+            'check_in_date': '',
+            'check_out_date': '',
+            'estimated_days': 7
+        }
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # Parse departure date
+        dep_date = datetime.strptime(departure_date, '%Y-%m-%d')
+        
+        # Estimate number of days based on duration
+        duration_map = {
+            '3-5天': 4,
+            '一周左右': 7,
+            '10-15天': 12,
+            '15天以上': 15
+        }
+        estimated_days = duration_map.get(duration, 7)
+        
+        # Calculate check-in and check-out dates
+        check_in = dep_date
+        check_out = dep_date + timedelta(days=estimated_days)
+        
+        # Format dates
+        dep_date_str = dep_date.strftime('%Y年%m月%d日')
+        check_in_str = check_in.strftime('%Y年%m月%d日')
+        check_out_str = check_out.strftime('%Y年%m月%d日')
+        
+        return {
+            'departure_date': dep_date_str,
+            'check_in_date': check_in_str,
+            'check_out_date': check_out_str,
+            'estimated_days': estimated_days
+        }
+    except Exception:
+        return {
+            'departure_date': departure_date,
+            'check_in_date': '',
+            'check_out_date': '',
+            'estimated_days': 7
+        }
 
 
 def create_tips_section(tips: List[str]) -> str:

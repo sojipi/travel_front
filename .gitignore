@@ -79,3 +79,8 @@ config.ini
 checklist_data/
 
 requirements.txt
+
+/frontend/node_modules/
+
+/backend/static/
+/node_modules/

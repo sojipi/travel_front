@@ -4,7 +4,7 @@ const AMAP_KEY = import.meta.env.VITE_AMAP_WEB_API_KEY
 const AMAP_STATIC_KEY = import.meta.env.VITE_AMAP_SERVER_API_KEY
 const AMAP_SECRET = import.meta.env.VITE_AMAP_API_SECRET
 
-function SmartTourGuide() {
+function SmartTourGuide({ selectedVoice }) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef([])
@@ -21,6 +21,8 @@ function SmartTourGuide() {
   const [searchResults, setSearchResults] = useState([])
   const [mapStyle, setMapStyle] = useState('卡通风格')
   const [showPoiLabels, setShowPoiLabels] = useState(true)
+  const [audioUrl, setAudioUrl] = useState('')
+  const [isPlaying, setIsPlaying] = useState(false)
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => mapInstanceRef.current?.remove(m))
@@ -100,11 +102,13 @@ function SmartTourGuide() {
     setLoading(true)
     setLoadingText('正在生成讲解词...')
     try {
-            const response = await fetch(`http://localhost:8001/api/tour-guide/explanation?poi_name=${encodeURIComponent(poi.name)}`)
+      const response = await fetch(`http://localhost:8001/api/tour-guide/explanation?poi_name=${encodeURIComponent(poi.name)}`)
       const data = await response.json()
       const content = data.explanation || '暂无讲解内容'
       setCurrentPoi(poi)
       setGuideContent(content)
+      setAudioUrl('')
+      setIsPlaying(false)
       setShowGuideModal(true)
     } catch (error) {
       console.error('请求错误:', error)
@@ -114,6 +118,33 @@ function SmartTourGuide() {
     }
     setLoading(false)
   }
+
+  const playGuideAudio = async (text, voice = 'xiaoyun') => {
+    if (!text || isPlaying) return
+    setIsPlaying(true)
+    setLoading(true)
+    setLoadingText('正在生成语音...')
+    try {
+      const response = await fetch(`http://localhost:8001/api/tour-guide/play-audio?text=${encodeURIComponent(text)}&voice=${voice}`)
+      const data = await response.json()
+      if (data.audio_url) {
+        setAudioUrl(data.audio_url)
+        const audio = new Audio(`http://localhost:8001${data.audio_url}`)
+        audio.onended = () => setIsPlaying(false)
+        audio.onerror = () => {
+          setIsPlaying(false)
+          alert('音频播放失败')
+        }
+        audio.play()
+      }
+    } catch (error) {
+      console.error('TTS调用错误:', error)
+      alert('TTS调用失败，请检查后端配置')
+    }
+    setLoading(false)
+  }
+
+
 
   const searchCity = () => {
     if (!searchKeyword.trim()) {
@@ -280,6 +311,24 @@ function SmartTourGuide() {
             </div>
             <div className="guide-body">
               <p className="guide-text">{guideContent}</p>
+              {/* 播放按钮 */}
+              {guideContent && (
+                <div className="guide-actions">
+                  <button
+                    className="play-audio-btn"
+                    onClick={() => playGuideAudio(guideContent, selectedVoice)}
+                    disabled={isPlaying}
+                  >
+                    {isPlaying ? '🔊 播放中...' : '🔊 播放讲解词'}
+                  </button>
+                </div>
+              )}
+              {/* 音频播放器 */}
+              {audioUrl && (
+                <div className="audio-player">
+                  <audio controls src={`http://localhost:8001${audioUrl}`} />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -408,7 +457,49 @@ function SmartTourGuide() {
         .guide-title { font-size: 16px; font-weight: bold; color: #333; }
         .guide-close { font-size: 24px; color: #999; cursor: pointer; }
         .guide-body { padding: 16px; max-height: 300px; overflow-y: auto; }
-        .guide-text { font-size: 14px; color: #666; line-height: 1.8; margin: 0; white-space: pre-wrap; }
+        .guide-text { font-size: 14px; color: #666; line-height: 1.8; margin: 0 0 16px 0; white-space: pre-wrap; }
+        .voice-selector {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+          padding: 12px;
+          background: #f5f5f5;
+          border-radius: 6px;
+        }
+        .voice-selector label { font-size: 14px; color: #333; font-weight: 500; }
+        .voice-select {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+          background: #fff;
+          cursor: pointer;
+        }
+        .voice-select:hover { border-color: #2196F3; }
+        .guide-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .play-audio-btn {
+          background: #2196F3;
+          color: #fff;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .play-audio-btn:hover { background: #1976D2; }
+        .play-audio-btn:disabled { background: #BDBDBD; cursor: not-allowed; }
+        .audio-player {
+          margin-top: 12px;
+          padding: 12px;
+          background: #f5f5f5;
+          border-radius: 4px;
+        }
+        .audio-player audio { width: 100%; }
       `}</style>
     </div>
   )

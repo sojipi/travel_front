@@ -5,16 +5,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
 import os
-import json
-from datetime import datetime
-from PIL import Image
-import moviepy.editor as mp
-from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeVideoClip
 import tempfile
 import uuid
 import sys
+import shutil
 import httpx
+from PIL import Image
 from dotenv import load_dotenv
+import asyncio
+import time
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,10 +23,73 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 from core.travel_functions import generate_destination_recommendation, generate_itinerary_plan, generate_checklist as create_checklist
+from core.video_editor import create_ai_video
 from api.openai_client import OpenAIClient
-import pyttsx3
+try:
+    from backend.aliyun_tts import get_tts_client
+except ImportError:
+    from aliyun_tts import get_tts_client
 
 app = FastAPI(title="银发族智能旅行助手 API", version="1.0.0")
+
+# 音频文件清理配置
+AUDIO_CLEANUP_INTERVAL = 3600  # 每小时检查一次
+AUDIO_FILE_TTL = 600  # 音频文件10分钟后过期（单位：秒）
+STATIC_DIR = "static"
+
+# TTS方言配置
+TTS_VOICE_OPTIONS = {
+    "xiaoyun": "标准普通话",
+    "chuangirl": "四川话",
+    "shanshan": "粤语",
+    "cuijie": "东北话",
+    "xiaoze": "湖南话",
+    "aikan": "天津话"
+}
+DEFAULT_VOICE = os.getenv("ALIYUN_TTS_DEFAULT_VOICE", "xiaoyun")
+
+
+async def cleanup_old_audio_files():
+    """清理过期的音频文件"""
+    try:
+        static_path = Path(STATIC_DIR)
+        if not static_path.exists():
+            return
+
+        current_time = time.time()
+        deleted_count = 0
+
+        for file in static_path.glob("tour_audio_*.mp3"):
+            file_age = current_time - file.stat().st_mtime
+            if file_age > AUDIO_FILE_TTL:
+                try:
+                    file.unlink()
+                    deleted_count += 1
+                    print(f"[Cleanup] 删除过期音频文件: {file.name}")
+                except Exception as e:
+                    print(f"[Cleanup] 删除文件失败 {file.name}: {e}")
+
+        if deleted_count > 0:
+            print(f"[Cleanup] 清理完成，删除了 {deleted_count} 个音频文件")
+    except Exception as e:
+        print(f"[Cleanup] 清理任务错误: {e}")
+
+
+async def start_cleanup_task():
+    """启动定期清理任务"""
+    while True:
+        await asyncio.sleep(AUDIO_CLEANUP_INTERVAL)
+        await cleanup_old_audio_files()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时的处理"""
+    print("[Startup] ========== TTS配置信息 ==========")
+    print(f"[Startup] 默认语音: {DEFAULT_VOICE} ({TTS_VOICE_OPTIONS.get(DEFAULT_VOICE, '未知')})")
+    print(f"[Startup] 支持的语音: {', '.join([f'{k}({v})' for k, v in TTS_VOICE_OPTIONS.items()])}")
+    print("[Startup] 启动音频文件清理任务...")
+    asyncio.create_task(start_cleanup_task())
 
 # 配置CORS
 app.add_middleware(
@@ -58,6 +121,7 @@ class ChecklistRequest(BaseModel):
     origin: str
     destination: str
     duration: str
+    departure_date: Optional[str] = ""
     needs: str
     itinerary_content: str
 
@@ -97,6 +161,7 @@ async def generate_checklist_api(request: ChecklistRequest):
             origin=request.origin,
             destination=request.destination,
             duration=request.duration,
+            departure_date=request.departure_date,
             special_needs=request.needs,
             itinerary_text=request.itinerary_content
         )
@@ -120,7 +185,6 @@ async def create_video(images: List[UploadFile] = File(...), audio: Optional[Upl
                 with Image.open(image_path) as img:
                     if img.mode == 'RGBA':
                         img = img.convert('RGB')
-                    img = img.resize((1920, 1080))  # 1080p
                     img.save(image_path, "JPEG")
                 image_paths.append(image_path)
             # 保存上传的音频
@@ -129,33 +193,26 @@ async def create_video(images: List[UploadFile] = File(...), audio: Optional[Upl
                 audio_path = os.path.join(temp_dir, "audio.mp3")
                 with open(audio_path, "wb") as f:
                     f.write(await audio.read())
-            # 创建视频
-            clip = ImageSequenceClip(image_paths, durations=[3] * len(image_paths))  # 每张图片显示3秒
-            # 添加音频
-            if audio_path:
-                audio_clip = AudioFileClip(audio_path)
-                # 如果音频比视频长，裁剪音频
-                if audio_clip.duration > clip.duration:
-                    audio_clip = audio_clip.subclip(0, clip.duration)
-                # 如果音频比视频短，循环音频
-                elif audio_clip.duration < clip.duration:
-                    audio_clip = mp.concatenate_audioclips([audio_clip] * (int(clip.duration / audio_clip.duration) + 1))
-                    audio_clip = audio_clip.subclip(0, clip.duration)
-                clip = clip.set_audio(audio_clip)
-            # 生成唯一的视频文件名
+
+            # 使用AI视频生成
+            result = create_ai_video(
+                images=image_paths,
+                audio=audio_path,
+                target_width=720,
+                target_height=1280  # 9:16 竖屏比例
+            )
+
+            # 复制视频到static目录
             video_id = str(uuid.uuid4())
             video_filename = f"travel_video_{video_id}.mp4"
-            video_path = os.path.join("static", video_filename)
-            # 保存视频
-            clip.write_videofile(video_path, fps=24, codec="libx264", audio_codec="aac")
-            # 关闭所有剪辑
-            clip.close()
-            if audio_path:
-                audio_clip.close()
-            # 返回视频URL
+            video_dest = os.path.join("static", video_filename)
+            shutil.copy(result['video_path'], video_dest)
+
             return {
-                "message": "视频生成成功！",
-                "video_path": f"/static/{video_filename}"
+                "message": "AI视频生成成功！",
+                "video_path": f"/static/{video_filename}",
+                "script": result.get('script', ''),
+                "image_descriptions": result.get('image_descriptions', [])
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -201,19 +258,49 @@ async def get_tour_explanation(poi_name: str):
 
 # 智能导游API - 播放导游词（TTS）
 @app.get("/api/tour-guide/play-audio")
-async def play_tour_audio(text: str):
+async def play_tour_audio(text: str, voice: str = "xiaoyun"):
     try:
-        # 初始化TTS引擎
-        engine = pyttsx3.init()
-        # 设置语速
-        engine.setProperty('rate', 150)
-        # 设置音量
-        engine.setProperty('volume', 0.9)
-        # 播放文本
-        engine.say(text)
-        engine.runAndWait()
-        return {"message": "音频播放完成"}
+        print(f"[TTS] 开始生成语音，文本: {text}, 语音: {voice}")
+        # 获取阿里云TTS客户端
+        tts_client = await get_tts_client()
+
+        # 调用TTS
+        print(f"[TTS] 调用text_to_speech...")
+        audio_data = await tts_client.text_to_speech(
+            text=text,
+            format="mp3",
+            sample_rate=16000,
+            voice=voice,
+            volume=80,
+            speech_rate=0,
+            pitch_rate=0
+        )
+        print(f"[TTS] 音频数据生成成功，大小: {len(audio_data)} bytes")
+
+        # 保存音频文件
+        audio_id = str(uuid.uuid4())
+        audio_filename = f"tour_audio_{audio_id}.mp3"
+        audio_path = os.path.join("static", audio_filename)
+
+        with open(audio_path, "wb") as f:
+            f.write(audio_data)
+
+        print(f"[TTS] 音频文件已保存: {audio_filename} (将在 {AUDIO_FILE_TTL} 秒后自动清理)")
+
+        return {
+            "message": "音频生成成功",
+            "audio_url": f"/static/{audio_filename}",
+            "format": "mp3",
+            "sample_rate": 16000,
+            "voice": voice,
+            "ttl": AUDIO_FILE_TTL
+        }
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[TTS] 错误: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # 安全提示API
